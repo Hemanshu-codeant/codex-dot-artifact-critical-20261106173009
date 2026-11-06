@@ -14,4 +14,3 @@ jq -n \
   }' > proof-result.json
 
 cat proof-result.json
-
