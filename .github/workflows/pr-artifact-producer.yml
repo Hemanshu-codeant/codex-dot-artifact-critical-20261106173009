@@ -33,3 +33,9 @@ jobs:
           path: payload
           if-no-files-found: error
 
+      - name: Upload a fixed second artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: fixed-control-artifact
+          path: fixed-control.txt
+          if-no-files-found: error
