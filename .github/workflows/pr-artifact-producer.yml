@@ -1,0 +1,35 @@
+name: Untrusted PR artifact producer
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Read the project artifact name
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_name=$(jq -er '.artifact_name | select(type == "string" and length > 0 and length < 100)' artifact-metadata.json)
+          {
+            printf 'name<<CODEX_EOF\n'
+            printf '%s\n' "$artifact_name"
+            printf 'CODEX_EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload the pull-request build output
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ${{ steps.metadata.outputs.name }}
+          path: payload
+          if-no-files-found: error
+

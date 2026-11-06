@@ -1,0 +1,58 @@
+name: Privileged artifact consumer
+
+on:
+  workflow_run:
+    workflows:
+      - Untrusted PR artifact producer
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  consume:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Record the trusted script hash before download
+        id: before
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'sha=%s\n' "$(sha256sum trusted/privileged.sh | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Download all triggering-run artifacts with per-artifact directories
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: ${{ github.workspace }}
+          merge-multiple: false
+
+      - name: Execute only the predeclared trusted path
+        shell: bash
+        env:
+          PROOF_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROOF_COMMENT_ID: '6691162254'
+          TRUSTED_SHA_BEFORE: ${{ steps.before.outputs.sha }}
+        run: |
+          set -euo pipefail
+          export TRUSTED_SHA_AFTER="$(sha256sum trusted/privileged.sh | cut -d' ' -f1)"
+          bash trusted/privileged.sh
+
+      - name: Publish the non-secret proof result
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: privileged-proof-result
+          path: proof-result.json
+          if-no-files-found: error
+
